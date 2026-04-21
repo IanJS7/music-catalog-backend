@@ -30,7 +30,7 @@ public class SongService {
 
     public SongResponse getSongById(Long id) {
         Song song = songRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Song not found with id: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada con id: " + id));
         return toResponse(song);
     }
 
@@ -38,7 +38,7 @@ public class SongService {
         validate(request);
 
         User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + request.getUserId()));
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con id: " + request.getUserId()));
 
         Song song = Song.builder()
                 .title(request.getTitle())
@@ -54,46 +54,41 @@ public class SongService {
         validate(request);
 
         Song song = songRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Song not found with id: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada con id: " + id));
 
         song.setTitle(request.getTitle());
         song.setArtist(request.getArtist());
         song.setImageUrl(request.getImageUrl());
+
+        // Si quieres que el usuario también cambie al editar, añade:
+        // User user = userRepository.findById(request.getUserId()).orElseThrow(...);
+        // song.setUser(user);
 
         return toResponse(songRepository.save(song));
     }
 
     public void deleteSong(Long id) {
         if (!songRepository.existsById(id)) {
-            throw new IllegalArgumentException("Song not found with id: " + id);
+            throw new IllegalArgumentException("Canción no encontrada con id: " + id);
         }
         songRepository.deleteById(id);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
     private SongResponse toResponse(Song song) {
+        // Creamos el objeto usando el constructor normal (el de @AllArgsConstructor)
         return new SongResponse(
                 song.getId(),
                 song.getTitle(),
                 song.getArtist(),
                 song.getImageUrl(),
-                song.getUser().getUsername()
+                song.getUser() != null ? song.getUser().getUsername() : "Anónimo"
         );
     }
 
     private void validate(SongRequest request) {
-        if (request.getTitle() == null || request.getTitle().isBlank()) {
-            throw new IllegalArgumentException("Title is required");
-        }
-        if (request.getArtist() == null || request.getArtist().isBlank()) {
-            throw new IllegalArgumentException("Artist is required");
-        }
-        if (request.getImageUrl() == null || request.getImageUrl().isBlank()) {
-            throw new IllegalArgumentException("Image URL is required");
-        }
-        if (request.getUserId() == null) {
-            throw new IllegalArgumentException("User ID is required");
-        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) throw new IllegalArgumentException("Título requerido");
+        if (request.getArtist() == null || request.getArtist().isBlank()) throw new IllegalArgumentException("Artista requerido");
+        if (request.getImageUrl() == null || request.getImageUrl().isBlank()) throw new IllegalArgumentException("URL de imagen requerida");
+        if (request.getUserId() == null) throw new IllegalArgumentException("ID de usuario requerido");
     }
 }
