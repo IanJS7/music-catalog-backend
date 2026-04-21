@@ -20,8 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement( // Usamos pushReplacement para que no pueda volver atrás al login
         context,
         MaterialPageRoute(builder: (context) => HomeScreen(
-            userId: user.id,
-            username: user.username
+
         )),
       );
     } else {

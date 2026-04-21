@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import '../models/song_model.dart'; // Nombre exacto de tu archivo
 import '../services/api_service.dart';
-import '../models/song_model.dart';
-import 'song_form_screen.dart';
+import 'song_form_screen.dart'; // Nombre exacto de tu archivo en la misma carpeta
 
 class HomeScreen extends StatefulWidget {
-  final int userId;
-  final String username;
-  const HomeScreen({super.key, required this.userId, required this.username});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -14,81 +12,109 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _apiService = ApiService();
-  late Future<List<Song>> _songsFuture;
+  List<Song> _songs = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _refreshSongs();
+    _fetchSongs();
   }
 
-  void _refreshSongs() {
-    setState(() {
-      _songsFuture = _apiService.getSongs();
-    });
+  // Función para obtener las canciones
+  Future<void> _fetchSongs() async {
+    try {
+      final songs = await _apiService.getSongs();
+      setState(() {
+        _songs = songs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("Error: $e");
+    }
   }
 
-  void _deleteSong(int id) async {
-    bool deleted = await _apiService.deleteSong(id);
-    if (deleted) _refreshSongs();
+  void _showForm({Song? song}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SongFormScreen(
+          song: song,
+          userId: 1, // ID temporal para el examen, luego puedes pasarlo desde el Login
+          onSave: () => _fetchSongs(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteSong(int id) async {
+    try {
+      await _apiService.deleteSong(id);
+      _fetchSongs();
+    } catch (e) {
+      debugPrint("Error al eliminar: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Hola, ${widget.username}"),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshSongs),
-        ],
+        title: const Text('Catálogo de Música'),
+        backgroundColor: const Color(0xFF311B92), // Color a juego con tu Login
       ),
-      body: FutureBuilder<List<Song>>(
-        future: _songsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("No hay canciones registradas"));
-          }
-
-          return ListView.builder(
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              final song = snapshot.data![index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                child: ListTile(
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: song.imageUrl.isNotEmpty
-                        ? Image.network(song.imageUrl, width: 50, height: 50, fit: BoxFit.cover, errorBuilder: (c,e,s) => const Icon(Icons.album))
-                        : const Icon(Icons.album, size: 50),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+        itemCount: _songs.length,
+        itemBuilder: (context, index) {
+          final song = _songs[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: ListTile(
+              leading: song.imageUrl.isNotEmpty
+                  ? Image.network(song.imageUrl, width: 50, fit: BoxFit.cover)
+                  : const Icon(Icons.music_note),
+              title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(song.artist),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Agregada por: ${song.addedBy}", // El campo de Postman
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueGrey,
+                    ),
                   ),
-                  title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(song.artist, style: TextStyle(color: Colors.grey[400])),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.redAccent),
-                    onPressed: () => _deleteSong(song.id),
+                ],
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () => _showForm(song: song),
                   ),
-                ),
-              );
-            },
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteSong(song.id!),
+                  ),
+                ],
+              ),
+            ),
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.purpleAccent,
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => SongFormScreen(userId: widget.userId)),
-          );
-          _refreshSongs();
-        },
-        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: () => _showForm(),
+        child: const Icon(Icons.add),
       ),
     );
   }
