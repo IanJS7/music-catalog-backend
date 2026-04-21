@@ -37,19 +37,25 @@ class ApiService {
   }
 
   Future<bool> createSong(String title, String artist, String url, int userId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/songs'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'title': title,
-        'artist': artist,
-        'imageUrl': url,
-        'user': {'id': userId}
-      }),
-    );
-    return response.statusCode == 201 || response.statusCode == 200;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/songs'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'title': title,
+          'artist': artist,
+          'imageUrl': url,
+          'user': {'id': userId} // Asegúrate que el JSON coincida con tu entidad Java
+        }),
+      );
+      // Si imprime 400 o 500, es error de la base de datos (ID inexistente)
+      print("Status code: ${response.statusCode}");
+      return response.statusCode == 201 || response.statusCode == 200;
+    } catch (e) {
+      print("Error al crear canción: $e");
+      return false;
+    }
   }
-
   Future<void> deleteSong(int id) async {
     await http.delete(Uri.parse('$baseUrl/songs/$id'));
   }
