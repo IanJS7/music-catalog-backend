@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,11 +18,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleLogin() async {
     final user = await _apiService.login(_userController.text, _passController.text);
     if (user != null && mounted) {
-      Navigator.pushReplacement( // Usamos pushReplacement para que no pueda volver atrás al login
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomeScreen(
-
-        )),
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -37,42 +36,31 @@ class _LoginScreenState extends State<LoginScreen> {
         width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
             colors: [Color(0xFF311B92), Color(0xFF121212)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.headset_mic, size: 80, color: Colors.white),
-              const SizedBox(height: 20),
-              const Text("Music Catalog", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 40),
-              TextField(
-                controller: _userController,
-                decoration: const InputDecoration(labelText: "Usuario", prefixIcon: Icon(Icons.person)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.headset_mic, size: 80, color: Colors.white),
+            const Text("Music Catalog", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
+            Padding(
+              padding: const EdgeInsets.all(30),
+              child: Column(
+                children: [
+                  TextField(controller: _userController, decoration: const InputDecoration(labelText: "Usuario", labelStyle: TextStyle(color: Colors.white70))),
+                  TextField(controller: _passController, obscureText: true, decoration: const InputDecoration(labelText: "Contraseña", labelStyle: TextStyle(color: Colors.white70))),
+                  const SizedBox(height: 30),
+                  ElevatedButton(onPressed: _handleLogin, child: const Text("INICIAR SESIÓN")),
+                  TextButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
+                    child: const Text("¿No tienes cuenta? Regístrate aquí", style: TextStyle(color: Colors.white)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _passController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Contraseña", prefixIcon: Icon(Icons.lock)),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.purpleAccent),
-                  onPressed: _handleLogin,
-                  child: const Text("INICIAR SESIÓN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
