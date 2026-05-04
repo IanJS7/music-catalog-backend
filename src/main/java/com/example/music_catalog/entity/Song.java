@@ -3,6 +3,8 @@ package com.example.music_catalog.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+
 @Entity
 @Table(name = "songs")
 @Getter
@@ -29,4 +31,21 @@ public class Song {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+// --- NUEVOS CAMPOS ---
+
+    @OneToMany(mappedBy = "song", cascade = CascadeType.ALL)
+    private List<Reaction> reactions;
+
+    @OneToMany(mappedBy = "song", cascade = CascadeType.ALL)
+    private List<Comment> comments;
+
+    // Campo auxiliar para enviar el nombre del dueño a Flutter más fácil
+    public String getAddedBy() {
+        return (user != null) ? user.getUsername() : "Desconocido";
+    }
+
+    // Campo auxiliar para el contador de likes que usaremos en el DTO/Frontend
+    public int getReactionCount() {
+        return (reactions != null) ? reactions.size() : 0;
+    }
 }

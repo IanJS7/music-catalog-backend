@@ -3,9 +3,9 @@ import '../services/api_service.dart';
 import '../models/song_model.dart';
 
 class SongFormScreen extends StatefulWidget {
-  final Song? song; // Para editar
+  final Song? song;
   final int userId;
-  final VoidCallback? onSave; // Para refrescar la lista
+  final VoidCallback? onSave;
 
   const SongFormScreen({super.key, this.song, required this.userId, this.onSave});
 
@@ -22,7 +22,6 @@ class _SongFormScreenState extends State<SongFormScreen> {
   @override
   void initState() {
     super.initState();
-    // Si estamos editando, cargamos los datos existentes
     if (widget.song != null) {
       _titleController.text = widget.song!.title;
       _artistController.text = widget.song!.artist;
@@ -32,44 +31,76 @@ class _SongFormScreenState extends State<SongFormScreen> {
 
   void _saveSong() async {
     if (_titleController.text.isEmpty || _artistController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Completa los campos")));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Completa los campos"))
+      );
       return;
     }
 
     bool success;
+    String finalUrl = _imageController.text.trim().isEmpty
+        ? "https://cdn-icons-png.flaticon.com/512/3844/3844724.png"
+        : _imageController.text;
+
     if (widget.song == null) {
-      // Crear nueva
+      // CREAR NUEVA CANCIÓN
       success = await _apiService.createSong(
         _titleController.text,
         _artistController.text,
-        _imageController.text.isEmpty ? "https://cdn-icons-png.flaticon.com/512/3844/3844724.png" : _imageController.text,
-        widget.userId,
+        finalUrl,
+        widget.userId, // Usa el ID del usuario que inició sesión
       );
     } else {
-      // Aquí iría tu lógica de editar (updateSong) si la tienes en el service
-      success = true;
+      // EDITAR CANCIÓN EXISTENTE (Ya no es success = true fijo)
+      success = await _apiService.updateSong(
+        widget.song!.id,
+        _titleController.text,
+        _artistController.text,
+        finalUrl,
+        widget.userId, // Mantiene el dueño o lo cambia al que edita
+      );
     }
 
     if (success && mounted) {
       if (widget.onSave != null) widget.onSave!();
       Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("¡Cambios guardados correctamente!"))
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Error al guardar. Revisa tu conexión."))
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container( // Usamos Container para que se vea bien en el BottomSheet
-      padding: const EdgeInsets.all(25),
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 25, // Para que el teclado no tape el botón
+        top: 25,
+        left: 25,
+        right: 25,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(widget.song == null ? "Nueva Canción" : "Editar Canción",
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(
+              widget.song == null ? "Nueva Canción" : "Editar Canción",
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+          ),
           TextField(controller: _titleController, decoration: const InputDecoration(labelText: "Título")),
           TextField(controller: _artistController, decoration: const InputDecoration(labelText: "Artista")),
           TextField(controller: _imageController, decoration: const InputDecoration(labelText: "URL Imagen")),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: _saveSong, child: const Text("GUARDAR")),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+                onPressed: _saveSong,
+                child: const Text("GUARDAR CAMBIOS")
+            ),
+          ),
         ],
       ),
     );

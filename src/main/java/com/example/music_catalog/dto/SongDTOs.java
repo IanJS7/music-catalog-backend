@@ -1,10 +1,11 @@
 package com.example.music_catalog.dto;
 
-import lombok.Data;
+import lombok.*;
+import java.util.List;
 
 public class SongDTOs {
 
-    @Data
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class SongRequest {
         private String title;
         private String artist;
@@ -12,20 +13,27 @@ public class SongDTOs {
         private Long userId;
     }
 
-    @Data
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class SongResponse {
         private Long id;
         private String title;
         private String artist;
         private String imageUrl;
-        private String addedBy; // username
+        private String addedBy;
+        private int reactionCount;
+        private List<CommentResponse> comments;
+    }
 
-        public SongResponse(Long id, String title, String artist, String imageUrl, String addedBy) {
-            this.id = id;
-            this.title = title;
-            this.artist = artist;
-            this.imageUrl = imageUrl;
-            this.addedBy = addedBy;
-        }
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class CommentResponse {
+        private String content;
+        private String username;
+        private String createdAt;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class CommentRequest {
+        private String content;
+        private Long userId;
     }
 }

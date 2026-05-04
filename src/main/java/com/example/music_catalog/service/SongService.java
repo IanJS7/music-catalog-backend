@@ -1,13 +1,12 @@
 package com.example.music_catalog.service;
 
 import com.example.music_catalog.dto.SongDTOs.*;
-import com.example.music_catalog.entity.Song;
-import com.example.music_catalog.entity.User;
-import com.example.music_catalog.repository.SongRepository;
-import com.example.music_catalog.repository.UserRepository;
+import com.example.music_catalog.entity.*;
+import com.example.music_catalog.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,18 +15,31 @@ public class SongService {
 
     private final SongRepository songRepository;
     private final UserRepository userRepository;
+    private final ReactionRepository reactionRepository;
+    private final CommentRepository commentRepository;
     private final String DEFAULT_IMAGE = "https://via.placeholder.com/500x500.png?text=No+Image+Found";
 
-    public SongService(SongRepository songRepository, UserRepository userRepository) {
+    public SongService(SongRepository songRepository,
+                       UserRepository userRepository,
+                       ReactionRepository reactionRepository,
+                       CommentRepository commentRepository) {
         this.songRepository = songRepository;
         this.userRepository = userRepository;
+        this.reactionRepository = reactionRepository;
+        this.commentRepository = commentRepository;
     }
 
     public List<SongResponse> getAllSongs() {
-        return songRepository.findAll()
+        return songRepository.findAllByOrderByIdDesc()
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    public SongResponse getSongById(Long id) {
+        Song song = songRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada con id: " + id));
+        return toResponse(song);
     }
 
     @Transactional
@@ -49,24 +61,19 @@ public class SongService {
     @Transactional
     public SongResponse updateSong(Long id, SongRequest request) {
         validate(request);
-
-        // 1. Buscamos la canción existente
         Song song = songRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada con id: " + id));
 
-        // 2. Actualizamos los campos
         song.setTitle(request.getTitle());
         song.setArtist(request.getArtist());
         song.setImageUrl(processImageUrl(request.getImageUrl()));
 
-        // 3. Opcional: Actualizar el usuario si es necesario
         if (!song.getUser().getId().equals(request.getUserId())) {
             User newUser = userRepository.findById(request.getUserId())
                     .orElseThrow(() -> new IllegalArgumentException("Nuevo usuario no encontrado"));
             song.setUser(newUser);
         }
 
-        // 4. Guardamos los cambios
         return toResponse(songRepository.save(song));
     }
 
@@ -77,6 +84,62 @@ public class SongService {
         songRepository.deleteById(id);
     }
 
+    // --- MÉTODOS DE REACCIONES ---
+
+    @Transactional
+    public void toggleLike(Long songId, Long userId) {
+        reactionRepository.findBySongIdAndUserId(songId, userId)
+                .ifPresentOrElse(
+                        reactionRepository::delete,
+                        () -> {
+                            Song song = songRepository.findById(songId).orElseThrow();
+                            User user = userRepository.findById(userId).orElseThrow();
+                            reactionRepository.save(Reaction.builder().song(song).user(user).build());
+                        }
+                );
+    }
+
+    // Este es el método que le faltaba a tu Controller para la línea 81
+    @Transactional
+    public void addReaction(Long songId, Long userId) {
+        Song song = songRepository.findById(songId)
+                .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        // Verificamos si ya existe la reacción para no duplicarla
+        if (reactionRepository.findBySongIdAndUserId(songId, userId).isEmpty()) {
+            reactionRepository.save(Reaction.builder()
+                    .song(song)
+                    .user(user)
+                    .build());
+        }
+    }
+
+    // --- MÉTODOS DE COMENTARIOS ---
+
+    @Transactional
+    public CommentResponse addComment(Long songId, CommentRequest request) {
+        Song song = songRepository.findById(songId)
+                .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada"));
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        Comment comment = Comment.builder()
+                .content(request.getContent())
+                .song(song)
+                .user(user)
+                .build();
+
+        Comment savedComment = commentRepository.save(comment);
+
+        return CommentResponse.builder()
+                .content(savedComment.getContent())
+                .username(user.getUsername())
+                .createdAt(savedComment.getCreatedAt() != null ? savedComment.getCreatedAt().toString() : "")
+                .build();
+    }
+
     private String processImageUrl(String url) {
         if (url == null || url.isBlank() || !url.toLowerCase().startsWith("http")) {
             return DEFAULT_IMAGE;
@@ -85,13 +148,24 @@ public class SongService {
     }
 
     private SongResponse toResponse(Song song) {
-        return new SongResponse(
-                song.getId(),
-                song.getTitle(),
-                song.getArtist(),
-                song.getImageUrl(),
-                song.getUser() != null ? song.getUser().getUsername() : "Anónimo"
-        );
+        List<CommentResponse> commentDtos = new ArrayList<>();
+        if (song.getComments() != null) {
+            commentDtos = song.getComments().stream().map(c -> CommentResponse.builder()
+                    .content(c.getContent())
+                    .username(c.getUser() != null ? c.getUser().getUsername() : "Anónimo")
+                    .createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : "")
+                    .build()).collect(Collectors.toList());
+        }
+
+        return SongResponse.builder()
+                .id(song.getId())
+                .title(song.getTitle())
+                .artist(song.getArtist())
+                .imageUrl(song.getImageUrl())
+                .addedBy(song.getUser() != null ? song.getUser().getUsername() : "Anónimo")
+                .reactionCount(song.getReactions() != null ? song.getReactions().size() : 0)
+                .comments(commentDtos)
+                .build();
     }
 
     private void validate(SongRequest request) {

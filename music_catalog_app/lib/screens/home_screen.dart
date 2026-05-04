@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../models/song_model.dart'; // Nombre exacto de tu archivo
+import '../models/song_model.dart';
+import '../models/user_model.dart';
 import '../services/api_service.dart';
-import 'song_form_screen.dart'; // Nombre exacto de tu archivo en la misma carpeta
+import 'song_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final User user;
+  const HomeScreen({super.key, required this.user});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -21,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchSongs();
   }
 
-  // Función para obtener las canciones
   Future<void> _fetchSongs() async {
     try {
       final songs = await _apiService.getSongs();
@@ -31,8 +32,43 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      debugPrint("Error: $e");
     }
+  }
+
+  // --- NUEVA FUNCIÓN PARA LIKES ---
+  Future<void> _toggleLike(int songId) async {
+    final success = await _apiService.toggleLike(songId, widget.user.id);
+    if (success) {
+      _fetchSongs(); // Refrescamos para ver el nuevo contador
+    }
+  }
+
+  // --- NUEVA FUNCIÓN PARA COMENTAR ---
+  void _showCommentDialog(int songId) {
+    final TextEditingController commentController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Escribir comentario"),
+        content: TextField(
+          controller: commentController,
+          decoration: const InputDecoration(hintText: "Ej: ¡Me encanta esta canción!"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              if (commentController.text.isNotEmpty) {
+                await _apiService.addComment(songId, widget.user.id, commentController.text);
+                Navigator.pop(context);
+                _fetchSongs();
+              }
+            },
+            child: const Text("Publicar"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showForm({Song? song}) {
@@ -43,28 +79,25 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: SongFormScreen(
           song: song,
-          userId: 1, // ID temporal para el examen, luego puedes pasarlo desde el Login
+          userId: widget.user.id,
           onSave: () => _fetchSongs(),
         ),
       ),
     );
   }
 
-  Future<void> _deleteSong(int id) async {
-    try {
-      await _apiService.deleteSong(id);
-      _fetchSongs();
-    } catch (e) {
-      debugPrint("Error al eliminar: $e");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Catálogo de Música'),
-        backgroundColor: const Color(0xFF311B92), // Color a juego con tu Login
+        title: const Text('Music Social Catalog'),
+        backgroundColor: const Color(0xFF311B92),
+        actions: [
+          Center(child: Padding(
+            padding: const EdgeInsets.only(right: 15),
+            child: Text("Hola, ${widget.user.username}"),
+          ))
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -74,39 +107,45 @@ class _HomeScreenState extends State<HomeScreen> {
           final song = _songs[index];
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: ListTile(
-              leading: song.imageUrl.isNotEmpty
-                  ? Image.network(song.imageUrl, width: 50, fit: BoxFit.cover)
-                  : const Icon(Icons.music_note),
+            child: ExpansionTile( // Usamos ExpansionTile para ver comentarios al tocar
+              leading: Image.network(song.imageUrl, width: 50, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.music_note)),
               title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(song.artist),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Agregada por: ${song.addedBy}", // El campo de Postman
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey,
-                    ),
-                  ),
-                ],
-              ),
+              subtitle: Text("${song.artist} • por ${song.addedBy}"),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // BOTÓN DE LIKE
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => _toggleLike(song.id),
+                        child: const Icon(Icons.favorite, color: Colors.red),
+                      ),
+                      Text("${song.reactionCount}", style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
                   IconButton(
                     icon: const Icon(Icons.edit, color: Colors.blue),
                     onPressed: () => _showForm(song: song),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _deleteSong(song.id!),
-                  ),
                 ],
               ),
+              children: [
+                // SECCIÓN DE COMENTARIOS
+                const Divider(),
+                ...song.comments.map((c) => ListTile(
+                  dense: true,
+                  title: Text("${c.username}: ${c.content}"),
+                  subtitle: Text(c.createdAt, style: const TextStyle(fontSize: 10)),
+                )),
+                TextButton.icon(
+                  onPressed: () => _showCommentDialog(song.id),
+                  icon: const Icon(Icons.comment),
+                  label: const Text("Añadir comentario"),
+                )
+              ],
             ),
           );
         },

@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 class ApiService {
   final String baseUrl = "https://music-catalog-backend-drry.onrender.com/api";
 
+  // --- MÉTODOS DE AUTENTICACIÓN ---
   Future<User?> login(String username, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
@@ -27,8 +28,9 @@ class ApiService {
     return response.statusCode == 201 || response.statusCode == 200;
   }
 
+  // --- MÉTODOS DE CANCIONES ---
   Future<List<Song>> getSongs() async {
-    final response = await http.get(Uri.parse('$baseUrl/songs'));
+    final response = await http.get(Uri.parse('$baseUrl/songs?t=${DateTime.now().millisecondsSinceEpoch}'));
     if (response.statusCode == 200) {
       List data = jsonDecode(response.body);
       return data.map((item) => Song.fromJson(item)).toList();
@@ -38,25 +40,75 @@ class ApiService {
 
   Future<bool> createSong(String title, String artist, String url, int userId) async {
     try {
+      String finalUrl = url.trim().isEmpty ? "default" : url;
       final response = await http.post(
         Uri.parse('$baseUrl/songs'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': title,
           'artist': artist,
-          'imageUrl': url,
-          'user': {'id': userId} // Asegúrate que el JSON coincida con tu entidad Java
+          'imageUrl': finalUrl,
+          'userId': userId
         }),
       );
-      // Si imprime 400 o 500, es error de la base de datos (ID inexistente)
-      print("Status code: ${response.statusCode}");
       return response.statusCode == 201 || response.statusCode == 200;
     } catch (e) {
-      print("Error al crear canción: $e");
       return false;
     }
   }
-  Future<void> deleteSong(int id) async {
-    await http.delete(Uri.parse('$baseUrl/songs/$id'));
+
+  Future<bool> updateSong(int id, String title, String artist, String url, int userId) async {
+    try {
+      String finalUrl = url.trim().isEmpty ? "default" : url;
+      final response = await http.put(
+        Uri.parse('$baseUrl/songs/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'title': title,
+          'artist': artist,
+          'imageUrl': finalUrl,
+          'userId': userId
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteSong(int id) async {
+    final response = await http.delete(Uri.parse('$baseUrl/songs/$id'));
+    return response.statusCode == 200 || response.statusCode == 204;
+  }
+
+  // --- NUEVOS MÉTODOS DE INTERACCIÓN ---
+
+  // Para dar o quitar Like (usa el QueryParam ?userId= que definimos en Java)
+  Future<bool> toggleLike(int songId, int userId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/songs/$songId/like?userId=$userId'),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Para enviar un comentario
+  Future<bool> addComment(int songId, int userId, String content) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/songs/$songId/comment'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'content': content
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 }

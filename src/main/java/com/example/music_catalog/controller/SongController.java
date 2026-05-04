@@ -18,6 +18,8 @@ public class SongController {
         this.songService = songService;
     }
 
+    // --- Endpoints de Canciones ---
+
     @GetMapping
     public ResponseEntity<List<SongResponse>> getAll() {
         return ResponseEntity.ok(songService.getAllSongs());
@@ -56,6 +58,28 @@ public class SongController {
         try {
             songService.deleteSong(id);
             return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    // --- Nuevos Endpoints: Comentarios y Reacciones ---
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<?> addComment(@PathVariable Long id, @RequestBody CommentRequest request) {
+        try {
+            CommentResponse response = songService.addComment(id, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/reactions")
+    public ResponseEntity<?> addReaction(@PathVariable Long id, @RequestParam Long userId) {
+        try {
+            songService.addReaction(id, userId);
+            return ResponseEntity.ok("Reacción registrada correctamente");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }

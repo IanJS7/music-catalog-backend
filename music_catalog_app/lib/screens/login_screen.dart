@@ -16,16 +16,24 @@ class _LoginScreenState extends State<LoginScreen> {
   final _apiService = ApiService();
 
   void _handleLogin() async {
+    // Aquí obtenemos el usuario desde la API
     final user = await _apiService.login(_userController.text, _passController.text);
+
     if (user != null && mounted) {
+      // CAMBIO AQUÍ: Pasamos el 'user' a la HomeScreen y quitamos el 'const'
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => HomeScreen(user: user)),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error: Credenciales incorrectas"), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Error: Credenciales incorrectas"),
+              backgroundColor: Colors.redAccent
+          ),
+        );
+      }
     }
   }
 
@@ -49,13 +57,39 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(30),
               child: Column(
                 children: [
-                  TextField(controller: _userController, decoration: const InputDecoration(labelText: "Usuario", labelStyle: TextStyle(color: Colors.white70))),
-                  TextField(controller: _passController, obscureText: true, decoration: const InputDecoration(labelText: "Contraseña", labelStyle: TextStyle(color: Colors.white70))),
+                  TextField(
+                      controller: _userController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: "Usuario",
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+                      )
+                  ),
+                  TextField(
+                      controller: _passController,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: "Contraseña",
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+                      )
+                  ),
                   const SizedBox(height: 30),
-                  ElevatedButton(onPressed: _handleLogin, child: const Text("INICIAR SESIÓN")),
+                  ElevatedButton(
+                      onPressed: _handleLogin,
+                      child: const Text("INICIAR SESIÓN")
+                  ),
                   TextButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
-                    child: const Text("¿No tienes cuenta? Regístrate aquí", style: TextStyle(color: Colors.white)),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const RegisterScreen())
+                    ),
+                    child: const Text(
+                        "¿No tienes cuenta? Regístrate aquí",
+                        style: TextStyle(color: Colors.white)
+                    ),
                   ),
                 ],
               ),
