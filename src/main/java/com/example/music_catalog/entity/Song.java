@@ -22,7 +22,8 @@ public class Song {
     @Column(nullable = false, length = 150)
     private String artist;
 
-    @Column(nullable = false, length = 500)
+    // Aumentamos a 1000 por si las URLs son largas
+    @Column(nullable = false, length = 1000)
     private String imageUrl;
 
     @ManyToOne(fetch = FetchType.EAGER)

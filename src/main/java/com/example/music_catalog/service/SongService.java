@@ -6,6 +6,7 @@ import com.example.music_catalog.entity.User;
 import com.example.music_catalog.repository.SongRepository;
 import com.example.music_catalog.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -15,6 +16,7 @@ public class SongService {
 
     private final SongRepository songRepository;
     private final UserRepository userRepository;
+    private final String DEFAULT_IMAGE = "https://via.placeholder.com/500x500.png?text=No+Image+Found";
 
     public SongService(SongRepository songRepository, UserRepository userRepository) {
         this.songRepository = songRepository;
@@ -22,48 +24,49 @@ public class SongService {
     }
 
     public List<SongResponse> getAllSongs() {
-        return songRepository.findAllByOrderByIdDesc()
+        return songRepository.findAll()
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    public SongResponse getSongById(Long id) {
-        Song song = songRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada con id: " + id));
-        return toResponse(song);
-    }
-
+    @Transactional
     public SongResponse createSong(SongRequest request) {
         validate(request);
-
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con id: " + request.getUserId()));
 
         Song song = Song.builder()
                 .title(request.getTitle())
                 .artist(request.getArtist())
-                .imageUrl(request.getImageUrl())
+                .imageUrl(processImageUrl(request.getImageUrl()))
                 .user(user)
                 .build();
 
         return toResponse(songRepository.save(song));
     }
 
+    @Transactional
     public SongResponse updateSong(Long id, SongRequest request) {
         validate(request);
 
+        // 1. Buscamos la canción existente
         Song song = songRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Canción no encontrada con id: " + id));
 
+        // 2. Actualizamos los campos
         song.setTitle(request.getTitle());
         song.setArtist(request.getArtist());
-        song.setImageUrl(request.getImageUrl());
+        song.setImageUrl(processImageUrl(request.getImageUrl()));
 
-        // Si quieres que el usuario también cambie al editar, añade:
-        // User user = userRepository.findById(request.getUserId()).orElseThrow(...);
-        // song.setUser(user);
+        // 3. Opcional: Actualizar el usuario si es necesario
+        if (!song.getUser().getId().equals(request.getUserId())) {
+            User newUser = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new IllegalArgumentException("Nuevo usuario no encontrado"));
+            song.setUser(newUser);
+        }
 
+        // 4. Guardamos los cambios
         return toResponse(songRepository.save(song));
     }
 
@@ -74,8 +77,14 @@ public class SongService {
         songRepository.deleteById(id);
     }
 
+    private String processImageUrl(String url) {
+        if (url == null || url.isBlank() || !url.toLowerCase().startsWith("http")) {
+            return DEFAULT_IMAGE;
+        }
+        return url;
+    }
+
     private SongResponse toResponse(Song song) {
-        // Creamos el objeto usando el constructor normal (el de @AllArgsConstructor)
         return new SongResponse(
                 song.getId(),
                 song.getTitle(),
@@ -88,7 +97,6 @@ public class SongService {
     private void validate(SongRequest request) {
         if (request.getTitle() == null || request.getTitle().isBlank()) throw new IllegalArgumentException("Título requerido");
         if (request.getArtist() == null || request.getArtist().isBlank()) throw new IllegalArgumentException("Artista requerido");
-        if (request.getImageUrl() == null || request.getImageUrl().isBlank()) throw new IllegalArgumentException("URL de imagen requerida");
         if (request.getUserId() == null) throw new IllegalArgumentException("ID de usuario requerido");
     }
 }
